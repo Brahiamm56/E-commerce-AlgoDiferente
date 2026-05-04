@@ -14,7 +14,7 @@ const connectionString =
   process.env.DATABASE_URL ?? "postgresql://demo:demo@localhost:5432/demo";
 
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
-  throw new Error("[prisma] DATABASE_URL is required in production.");
+  console.warn("[prisma] DATABASE_URL is not set — DB features will be unavailable.");
 }
 
 function createPrismaClient() {

@@ -33,7 +33,9 @@ function hasConfiguredValue(value?: string | null) {
 }
 
 export function isDatabaseConfigured() {
-  return hasConfiguredValue(process.env.DATABASE_URL);
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+  return hasConfiguredValue(url);
 }
 
 export function isCloudinaryConfigured() {
@@ -85,42 +87,24 @@ export function getEnvironmentChecklist() {
 let assertedProductionEnv = false;
 export function assertProductionEnv() {
   if (assertedProductionEnv) return;
-  if (process.env.NODE_ENV !== "production") {
-    assertedProductionEnv = true;
-    return;
-  }
+  assertedProductionEnv = true;
+  if (process.env.NODE_ENV !== "production") return;
 
-  // Only the vars that are strictly required for the app to boot.
-  // Cloudinary / Supabase keys are needed for uploads/auth but the store
-  // can still render pages without them — so we warn rather than throw.
-  const required = [
+  // Log warnings for any missing vars — never throw, so the app always boots.
+  const all = [
     "DATABASE_URL",
     "NEXTAUTH_SECRET",
-  ];
-  const missing = required.filter((key) => !hasConfiguredValue(process.env[key]));
-  if (missing.length > 0) {
-    // Do not include actual values, just keys.
-    throw new Error(
-      `[env] Missing required production env vars: ${missing.join(", ")}. ` +
-        `Configure them in your hosting provider before booting.`,
-    );
-  }
-
-  // Warn (but don't throw) for vars that affect features but not page rendering.
-  const recommended = [
     "NEXTAUTH_URL",
     "NEXT_PUBLIC_APP_URL",
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
   ];
-  const missingRecommended = recommended.filter((key) => !hasConfiguredValue(process.env[key]));
-  if (missingRecommended.length > 0) {
+  const missing = all.filter((key) => !hasConfiguredValue(process.env[key]));
+  if (missing.length > 0) {
     console.warn(
-      `[env] Recommended env vars not set: ${missingRecommended.join(", ")}. ` +
-        `Some features may be unavailable.`,
+      `[env] Missing env vars in production: ${missing.join(", ")}. ` +
+        `Configure them in your hosting provider. Some features will be unavailable.`,
     );
   }
-
-  assertedProductionEnv = true;
 }
