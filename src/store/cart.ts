@@ -3,6 +3,12 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 export type CartItem = {
   id: string;
+  productId?: string;
+  variantId?: string;
+  internalSku?: string;
+  variantLabel?: string;
+  size?: string;
+  colorName?: string;
   slug: string;
   name: string;
   image: string;
@@ -10,10 +16,12 @@ export type CartItem = {
   quantity: number;
 };
 
+export type CartItemInput = Omit<CartItem, "quantity">;
+
 type CartState = {
   items: CartItem[];
   isOpen: boolean;
-  addItem: (item: Omit<CartItem, "quantity">) => void;
+  addItem: (item: CartItemInput) => void;
   decrementItem: (id: string) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;

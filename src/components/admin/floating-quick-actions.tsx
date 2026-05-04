@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Plus, ShoppingBag, PackagePlus } from "lucide-react";
+import { MonitorSmartphone, PackagePlus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const quickActions = [
   {
-    href: "/admin/ventas?new=1",
-    label: "Nueva venta",
-    icon: ShoppingBag,
+    href: "/admin/pos",
+    label: "Abrir POS",
+    icon: MonitorSmartphone,
     iconClass: "bg-slate-100 text-slate-700",
   },
   {

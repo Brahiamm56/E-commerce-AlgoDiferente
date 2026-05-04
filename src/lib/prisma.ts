@@ -1,5 +1,6 @@
-import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { Pool } from "pg";
 
 import { assertProductionEnv } from "@/lib/env";
 
@@ -9,18 +10,23 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-const connectionString = process.env.DATABASE_URL ?? "postgresql://demo:demo@localhost:5432/demo";
+const connectionString =
+  process.env.DATABASE_URL ?? "postgresql://demo:demo@localhost:5432/demo";
 
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
   throw new Error("[prisma] DATABASE_URL is required in production.");
 }
 
-const adapter = new PrismaNeon({ connectionString });
-
 function createPrismaClient() {
-  return new PrismaClient({
-    adapter,
+  const pool = new Pool({
+    connectionString,
+    ssl: {
+      rejectUnauthorized: process.env.NODE_ENV === "production",
+    },
   });
+  const adapter = new PrismaPg(pool);
+
+  return new PrismaClient({ adapter });
 }
 
 const requiredDelegates = ["category", "heroBanner", "product", "productImage", "setting"] as const;

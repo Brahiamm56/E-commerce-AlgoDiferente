@@ -1,7 +1,7 @@
 "use client";
 
 import { Upload, X } from "lucide-react";
-import { type ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, Fragment, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,10 +47,6 @@ export function ProductImagesField({
   const [manualUrl, setManualUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setItems(normalizeItems(defaultItems));
-  }, [defaultItems]);
 
   const remainingSlots = Math.max(0, maxItems - items.length);
 

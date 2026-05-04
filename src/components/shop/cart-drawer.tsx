@@ -38,6 +38,8 @@ export function CartDrawer({ open, whatsappNumber, freeShippingThresholdCents, o
             name: item.name,
             quantity: item.quantity,
             priceCents: item.priceCents,
+            variantLabel: item.variantLabel,
+            internalSku: item.internalSku,
           })),
           { name: customerName, deliveryMethod, notes },
           whatsappNumber
@@ -192,6 +194,11 @@ export function CartDrawer({ open, whatsappNumber, freeShippingThresholdCents, o
                   </Link>
                   <div className="flex flex-1 flex-col gap-1">
                     <p className="text-sm font-medium leading-tight">{item.name}</p>
+                    {item.variantLabel ? (
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        {item.variantLabel}{item.internalSku ? ` · SKU ${item.internalSku}` : ""}
+                      </p>
+                    ) : null}
                     <p className="text-sm font-semibold text-[var(--foreground)]">
                       {formatCurrencyFromCents(item.priceCents)}
                     </p>
@@ -271,8 +278,8 @@ export function CartDrawer({ open, whatsappNumber, freeShippingThresholdCents, o
             
             {!showCheckoutForm ? (
               <>
-                <Button onClick={() => setShowCheckoutForm(true)} className="w-full" size="lg" variant="accent">
-                  Continuar con el pedido
+                <Button asChild className="w-full" size="lg" variant="accent">
+                  <Link href="/checkout" onClick={onClose}>Ir al checkout</Link>
                 </Button>
                 <Link
                   className="block w-full text-center text-sm font-medium text-[var(--accent)] transition hover:underline"

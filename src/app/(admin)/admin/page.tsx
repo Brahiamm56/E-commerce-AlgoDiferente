@@ -1,26 +1,25 @@
 ﻿import Link from "next/link";
 import {
   ArrowUpRight,
-  Boxes,
+  BarChart3,
   CircleDollarSign,
-  Layers3,
   PackageOpen,
+  PackageCheck,
+  Percent,
   Receipt,
   ShoppingBag,
-  Sparkles,
   TrendingUp,
   TriangleAlert,
 } from "lucide-react";
 
-import SalesChart from "@/components/admin/sales-chart";
+import { ReportsCharts } from "@/components/admin/reports-charts";
 import StatsCard from "@/components/admin/stats-card";
 import { getAdminCategories, getAdminProducts } from "@/lib/admin-catalog";
-import { getSales, getSalesByDay, getSalesSummary } from "@/lib/admin-sales";
+import { getSales, getSalesSummary } from "@/lib/admin-sales";
+import { getAdminReports } from "@/lib/reports";
 import { formatCurrencyFromCents } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 function timeAgo(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -34,26 +33,15 @@ function timeAgo(date: Date): string {
 }
 
 export default async function AdminOverviewPage() {
-  const [products, categories, sales, salesSummary, salesByDay] = await Promise.all([
+  const [products, categories, sales, salesSummary, reports] = await Promise.all([
     getAdminProducts(),
     getAdminCategories(),
     getSales(5),
     getSalesSummary(),
-    getSalesByDay(7),
+    getAdminReports(30),
   ]);
 
-  const totalStock = products.reduce((sum, product) => sum + product.stock, 0);
   const lowStockProducts = products.filter((product) => product.stock <= 3);
-  const publishedProducts = products.filter((product) => product.status === "PUBLISHED");
-  const inventoryValueCents = products.reduce(
-    (sum, product) => sum + product.priceCents * product.stock,
-    0,
-  );
-
-  const chartData = salesByDay.map((bucket) => ({
-    name: dayNames[bucket.date.getDay()],
-    sales: Math.round(bucket.cents / 100),
-  }));
 
   const recentProducts = [...products]
     .sort((a, b) => {
@@ -77,18 +65,36 @@ export default async function AdminOverviewPage() {
       </header>
 
       {/* KPIs Principales (simplificado) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatsCard
           icon={CircleDollarSign}
           title="Ventas Hoy"
-          value={formatCurrencyFromCents(salesSummary.todayCents)}
+          value={formatCurrencyFromCents(reports.todayCents)}
           accent="emerald"
         />
         <StatsCard
           icon={TrendingUp}
-          title="Ingresos 7 días"
-          value={formatCurrencyFromCents(salesSummary.last7DaysCents)}
+          title="Semana"
+          value={formatCurrencyFromCents(reports.weekCents)}
           accent="violet"
+        />
+        <StatsCard
+          icon={BarChart3}
+          title="Mes"
+          value={formatCurrencyFromCents(reports.monthCents)}
+          accent="violet"
+        />
+        <StatsCard
+          icon={PackageCheck}
+          title="Productos"
+          value={reports.productsSold.toString()}
+          accent="emerald"
+        />
+        <StatsCard
+          icon={Percent}
+          title="Margen"
+          value={`${reports.marginPercent}%`}
+          accent="amber"
         />
         <StatsCard
           icon={ShoppingBag}
@@ -96,31 +102,26 @@ export default async function AdminOverviewPage() {
           value={salesSummary.pendingCount.toString()}
           accent="amber"
         />
-        <StatsCard
-          icon={TriangleAlert}
-          title="Alertas de Stock"
-          value={lowStockProducts.length.toString()}
-          accent="rose"
-        />
       </div>
 
       {/* Main Charts & Data */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <div className="mb-1 flex items-center justify-between">
-            <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-slate-800">
-              Ventas · Últimos 7 días
-            </h3>
+        <div className="space-y-3 lg:col-span-2">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-slate-800">
+                Reportes comerciales
+              </h3>
+              <p className="text-xs text-slate-400">Ventas por día y ranking de medios de pago.</p>
+            </div>
             <Link
               className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700"
-              href="/admin/ventas"
+              href="/admin/pos"
             >
-              Ver historial <ArrowUpRight className="size-3.5" />
+              Ir al POS <ArrowUpRight className="size-3.5" />
             </Link>
           </div>
-          <p className="text-xs text-slate-400">Total facturado por día (completadas + pendientes).</p>
-
-          <SalesChart data={chartData} />
+          <ReportsCharts paymentRanking={reports.paymentRanking} salesByDay={reports.salesByDay} />
         </div>
 
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -129,10 +130,10 @@ export default async function AdminOverviewPage() {
               Ventas recientes
             </h3>
             <Link
-              href="/admin/ventas"
+              href="/admin/pos"
               className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 transition-colors hover:text-violet-700"
             >
-              Ver todas <ArrowUpRight className="size-3.5" />
+              Nueva venta <ArrowUpRight className="size-3.5" />
             </Link>
           </div>
 
@@ -143,9 +144,9 @@ export default async function AdminOverviewPage() {
                 <p className="text-sm">Aún no hay ventas registradas</p>
                 <Link
                   className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-                  href="/admin/ventas?new=1"
+                  href="/admin/pos"
                 >
-                  + Registrar la primera
+                  Abrir POS
                 </Link>
               </div>
             ) : (
@@ -173,6 +174,47 @@ export default async function AdminOverviewPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-slate-800">
+            Top productos vendidos
+          </h3>
+          <div className="mt-4 divide-y divide-slate-100">
+            {reports.topProducts.length === 0 ? (
+              <p className="py-6 text-sm text-slate-400">Sin ventas suficientes para ranking.</p>
+            ) : (
+              reports.topProducts.map((item) => (
+                <div className="flex items-center justify-between gap-3 py-3 text-sm" key={item.label}>
+                  <span className="font-medium text-slate-700">{item.label}</span>
+                  <span className="text-right text-slate-500">
+                    {item.value} u. · {formatCurrencyFromCents(item.totalCents)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold text-slate-800">
+            Top rentabilidad
+          </h3>
+          <div className="mt-4 divide-y divide-slate-100">
+            {reports.topProfitProducts.length === 0 ? (
+              <p className="py-6 text-sm text-slate-400">Sin margen calculado todavía.</p>
+            ) : (
+              reports.topProfitProducts.map((item) => (
+                <div className="flex items-center justify-between gap-3 py-3 text-sm" key={item.label}>
+                  <span className="font-medium text-slate-700">{item.label}</span>
+                  <span className="text-right text-slate-500">
+                    {formatCurrencyFromCents(item.totalCents)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

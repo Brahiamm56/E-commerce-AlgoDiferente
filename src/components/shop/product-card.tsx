@@ -7,14 +7,14 @@ import { QuickView } from "@/components/shop/quick-view";
 import { WishlistButton } from "@/components/shop/wishlist-button";
 import { Badge } from "@/components/ui/badge";
 import { type CatalogProduct } from "@/lib/catalog";
-import { formatCurrencyFromCents } from "@/lib/utils";
+import { formatPriceRangeFromCents } from "@/lib/utils";
 
 const BLUR_PLACEHOLDER =
   "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjEwIiB2aWV3Qm94PSIwIDAgOCAxMCI+PHJlY3Qgd2lkdGg9IjgiIGhlaWdodD0iMTAiIGZpbGw9IiNlOGUyZGEiLz48L3N2Zz4=";
 
 export function ProductCard({ product }: { product: CatalogProduct }) {
   const lowStock = product.stock > 0 && product.stock <= 3;
-  const outOfStock = product.stock === 0;
+  const lastUnit = product.stock <= 0;
 
   return (
     <article
@@ -40,42 +40,39 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
           width={720}
         />
 
-        {/* Top-left dynamic badges */}
         <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5 sm:left-4 sm:top-4">
-          {product.isNew && (
+          {product.isNew ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm animate-soft-pulse sm:text-[10px]">
               <Sparkles className="size-2.5 sm:size-3" />
               Nuevo
             </span>
-          )}
-          {lowStock && !outOfStock && (
+          ) : null}
+          {lowStock ? (
             <span className="inline-flex items-center rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm sm:text-[10px]">
               Últimas {product.stock}
             </span>
-          )}
-          {outOfStock && (
+          ) : null}
+          {lastUnit ? (
             <span className="inline-flex items-center rounded-full bg-neutral-700/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm sm:text-[10px]">
-              Agotado
+              Último en stock
             </span>
-          )}
+          ) : null}
         </div>
 
-        {/* Top-right wishlist + quick view */}
         <div className="absolute right-3 top-3 z-10 flex flex-col items-end gap-1.5 sm:right-4 sm:top-4">
           <WishlistButton product={product} />
-          <div className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 hidden sm:block">
+          <div className="hidden opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
             <QuickView product={product} />
           </div>
         </div>
 
-        {/* Bottom: category + stock */}
         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between p-3 sm:p-4">
           <Badge className="bg-white/90 text-[var(--foreground)] text-[10px] sm:text-[11px]">{product.category.name}</Badge>
-          {!outOfStock && (
+          {!lastUnit ? (
             <span className="rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm sm:px-3 sm:py-1 sm:text-xs">
               Stock {product.stock}
             </span>
-          )}
+          ) : null}
         </div>
       </Link>
 
@@ -96,7 +93,7 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
 
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-bold text-[var(--foreground)] sm:text-base">
-            {formatCurrencyFromCents(product.priceCents)}
+            {formatPriceRangeFromCents(product.minPriceCents, product.maxPriceCents)}
           </p>
           <AddToCartButton product={product} />
         </div>

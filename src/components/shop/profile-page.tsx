@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, Package, ShoppingCart, Trash2, User, X } from "lucide-react";
+import { Heart, Package, ShoppingCart, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { formatCurrencyFromCents } from "@/lib/utils";
+import { formatCurrencyFromCents, formatPriceRangeFromCents } from "@/lib/utils";
 import { useCartStore } from "@/store/cart";
 import { useWishlistStore } from "@/store/wishlist";
 
@@ -49,7 +49,11 @@ export function ProfilePage() {
 
   // Hydration guard
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function handleSave() {
     saveProfile(profile);
@@ -256,14 +260,38 @@ export function ProfilePage() {
                   <Link href={`/productos/${item.slug}`} className="text-sm font-medium leading-tight hover:underline line-clamp-1">
                     {item.name}
                   </Link>
-                  <p className="mt-0.5 text-sm font-semibold">{formatCurrencyFromCents(item.priceCents)}</p>
+                  <p className="mt-0.5 text-sm font-semibold">{formatPriceRangeFromCents(item.minPriceCents, item.maxPriceCents)}</p>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                   <button
                     type="button"
                     aria-label={`Agregar ${item.name} al carrito`}
                     onClick={() => {
-                      addToCart(item);
+                      const variant = item.defaultVariant;
+                      addToCart(
+                        variant
+                          ? {
+                              id: variant.id,
+                              productId: item.id,
+                              variantId: variant.id,
+                              internalSku: variant.internalSku,
+                              variantLabel: variant.label,
+                              size: variant.size,
+                              colorName: variant.colorName,
+                              slug: item.slug,
+                              name: item.name,
+                              image: item.image,
+                              priceCents: variant.priceCents,
+                            }
+                          : {
+                              id: item.id,
+                              productId: item.id,
+                              slug: item.slug,
+                              name: item.name,
+                              image: item.image,
+                              priceCents: item.priceCents,
+                            },
+                      );
                       openCart();
                     }}
                     className="flex size-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted-foreground)] transition hover:bg-[var(--accent)] hover:border-[var(--accent)] hover:text-white"

@@ -14,7 +14,6 @@ import {
   ShoppingCart,
   Tag,
   User,
-  UserRound,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -24,7 +23,7 @@ import { useCartStore } from "@/store/cart";
 import { useWishlistStore } from "@/store/wishlist";
 import { searchProducts } from "@/actions/shop";
 import type { CatalogProduct } from "@/lib/catalog";
-import { formatCurrencyFromCents } from "@/lib/utils";
+import { formatPriceRangeFromCents } from "@/lib/utils";
 
 type ShopHeaderProps = {
   storeName: string;
@@ -87,7 +86,6 @@ export function ShopHeader({ storeName, whatsappHref, whatsappNumber, logoUrl, f
   // Predictive search debounce
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults([]);
       return;
     }
 
@@ -143,6 +141,16 @@ export function ShopHeader({ storeName, whatsappHref, whatsappNumber, logoUrl, f
       setSearchOpen(false);
       setMenuOpen(false);
       setSearchQuery("");
+      setSearchResults([]);
+    }
+  };
+
+  const handleSearchQueryChange = (value: string) => {
+    setSearchQuery(value);
+
+    if (!value.trim()) {
+      setIsSearching(false);
+      setSearchResults([]);
     }
   };
 
@@ -272,7 +280,7 @@ export function ShopHeader({ storeName, whatsappHref, whatsappNumber, logoUrl, f
               ref={searchInputRef}
               type="search"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchQueryChange(e.target.value)}
             />
           </form>
 
@@ -291,6 +299,7 @@ export function ShopHeader({ storeName, whatsappHref, whatsappNumber, logoUrl, f
                       onClick={() => {
                         setMenuOpen(false);
                         setSearchQuery("");
+                        setSearchResults([]);
                       }}
                     >
                       <div className="relative size-12 shrink-0 overflow-hidden rounded-md border border-[var(--border)]">
@@ -298,7 +307,7 @@ export function ShopHeader({ storeName, whatsappHref, whatsappNumber, logoUrl, f
                       </div>
                       <div className="flex flex-col">
                         <span className="line-clamp-1 text-sm font-medium">{product.name}</span>
-                        <span className="text-xs font-semibold text-[var(--muted-foreground)]">{formatCurrencyFromCents(product.priceCents)}</span>
+                        <span className="text-xs font-semibold text-[var(--muted-foreground)]">{formatPriceRangeFromCents(product.minPriceCents, product.maxPriceCents)}</span>
                       </div>
                     </Link>
                   ))}
@@ -308,6 +317,7 @@ export function ShopHeader({ storeName, whatsappHref, whatsappNumber, logoUrl, f
                       router.push(`/productos?q=${encodeURIComponent(searchQuery)}`);
                       setMenuOpen(false);
                       setSearchQuery("");
+                      setSearchResults([]);
                     }}
                     type="button"
                   >

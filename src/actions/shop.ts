@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-import { getCatalogProducts } from "@/lib/catalog";
+import { getCatalogProducts, mapCatalogProduct } from "@/lib/catalog";
 import { isDatabaseConfigured } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
@@ -29,23 +29,26 @@ export async function searchProducts(query: string) {
         include: {
           category: { select: { name: true, slug: true } },
           images: { select: { url: true }, orderBy: { sortOrder: "asc" }, take: 1 },
+          variants: {
+            where: { active: true },
+            select: {
+              id: true,
+              internalSku: true,
+              size: true,
+              colorName: true,
+              colorHex: true,
+              price: true,
+              stock: true,
+              stockReserved: true,
+            },
+            orderBy: [{ colorName: "asc" }, { size: "asc" }],
+          },
         },
         orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
         take: MAX_RESULTS,
       });
 
-      return rows.map((p) => ({
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        description: p.description,
-        category: p.category,
-        priceCents: p.priceCents,
-        stock: p.stock,
-        featured: p.featured,
-        image: p.images[0]?.url ?? "",
-        accent: "from-[#f6d0c7] via-[#fff8f5] to-[#d9ece8]",
-      }));
+      return rows.map(mapCatalogProduct);
     } catch {
       return [];
     }

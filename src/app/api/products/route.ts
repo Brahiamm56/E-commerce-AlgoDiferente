@@ -83,6 +83,7 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         slug: parsed.data.slug,
         description: parsed.data.description,
+        kind: parsed.data.kind,
         priceCents: parsed.data.priceCents,
         stock: parsed.data.stock,
         featured: parsed.data.featured,

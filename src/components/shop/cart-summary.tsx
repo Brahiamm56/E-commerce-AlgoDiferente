@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { buildWhatsappLink } from "@/lib/whatsapp";
 import { formatCurrencyFromCents } from "@/lib/utils";
 import { useCartStore } from "@/store/cart";
 
@@ -18,16 +17,6 @@ export function CartSummary() {
 
   const total = items.reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const checkoutUrl =
-    items.length > 0
-      ? buildWhatsappLink(
-          items.map((item) => ({
-            name: item.name,
-            quantity: item.quantity,
-            priceCents: item.priceCents,
-          })),
-        )
-      : "#";
 
   if (items.length === 0) {
     return (
@@ -76,6 +65,11 @@ export function CartSummary() {
                 {formatCurrencyFromCents(item.priceCents)}
                 <span className="ml-1 text-xs text-[var(--muted-foreground)]">c/u</span>
               </p>
+              {item.variantLabel ? (
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {item.variantLabel}{item.internalSku ? ` · SKU ${item.internalSku}` : ""}
+                </p>
+              ) : null}
 
               {/* Quantity controls + delete */}
               <div className="mt-auto flex items-center gap-3 pt-1">
@@ -146,14 +140,12 @@ export function CartSummary() {
         </div>
 
         <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
-          Al confirmar, se abre WhatsApp con tu pedido listo para enviar.
+          Al confirmar, se crea el pedido y continuás el pago con Mercado Pago.
         </p>
 
         <div className="mt-5 flex flex-col gap-2.5">
           <Button asChild size="lg" variant="accent">
-            <a href={checkoutUrl} rel="noreferrer" target="_blank">
-              Confirmar pedido por WhatsApp
-            </a>
+            <Link href="/checkout">Ir al checkout</Link>
           </Button>
           <Button asChild size="lg" variant="outline">
             <Link href="/productos">Seguir comprando</Link>

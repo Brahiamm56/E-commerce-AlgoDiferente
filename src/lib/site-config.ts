@@ -9,5 +9,5 @@ export const siteConfig = {
   whatsappNumber: sanitizeWhatsappNumber(
     process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "573001234567",
   ),
-  currency: process.env.NEXT_PUBLIC_CURRENCY ?? "COP",
+  currency: process.env.NEXT_PUBLIC_CURRENCY ?? "ARS",
 };

@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 :root {
-	--background: #f4efe8;
-	--foreground: #14110f;
-	--surface: rgba(255, 255, 255, 0.7);
+	--background: #f7f4fb;
+	--foreground: #16121f;
+	--surface: rgba(255, 255, 255, 0.78);
 	--surface-strong: rgba(255, 255, 255, 0.92);
-	--muted-foreground: #655e57;
-	--border: rgba(20, 17, 15, 0.08);
-	--accent: #d35d47;
-	--accent-strong: #8f2616;
-	--accent-ink: #fff7f3;
-	--shadow: 0 20px 60px rgba(31, 18, 11, 0.12);
+	--muted-foreground: #5f586b;
+	--border: rgba(77, 60, 103, 0.12);
+	--accent: #7c3aed;
+	--accent-strong: #5b21b6;
+	--accent-ink: #f7f2ff;
+	--shadow: 0 20px 60px rgba(39, 28, 57, 0.10);
 	/* Storefront design tokens */
 	--card-bg: #ffffff;
-	--card-border: #e8e2da;
+	--card-border: #e7e0f2;
 	--card-radius: 1rem;
 	--btn-radius: 9999px;
 }

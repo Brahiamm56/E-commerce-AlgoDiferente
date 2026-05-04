@@ -9,13 +9,15 @@ import { formatCurrencyFromCents } from "@/lib/utils";
 import type { CatalogProduct } from "@/lib/catalog";
 
 type StickyAddToCartProps = {
-  product: Pick<CatalogProduct, "id" | "slug" | "name" | "image" | "priceCents">;
+  product: Pick<CatalogProduct, "id" | "slug" | "name" | "image" | "priceCents" | "defaultVariant">;
 };
 
 export function StickyAddToCart({ product }: StickyAddToCartProps) {
   const [isVisible, setIsVisible] = useState(false);
   const addItem = useCartStore((state) => state.addItem);
   const openCart = useCartStore((state) => state.openCart);
+  const variant = product.defaultVariant;
+  const priceCents = variant?.priceCents ?? product.priceCents;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,7 +52,7 @@ export function StickyAddToCart({ product }: StickyAddToCartProps) {
           <div className="flex flex-col truncate">
             <span className="truncate text-xs font-semibold leading-tight">{product.name}</span>
             <span className="text-[11px] font-medium text-[var(--foreground)]">
-              {formatCurrencyFromCents(product.priceCents)}
+              {formatCurrencyFromCents(priceCents)}
             </span>
           </div>
         </div>
@@ -58,7 +60,30 @@ export function StickyAddToCart({ product }: StickyAddToCartProps) {
         <button
           className="flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 text-xs font-semibold text-white transition hover:opacity-85"
           onClick={() => {
-            addItem(product);
+            addItem(
+              variant
+                ? {
+                    id: variant.id,
+                    productId: product.id,
+                    variantId: variant.id,
+                    internalSku: variant.internalSku,
+                    variantLabel: variant.label,
+                    size: variant.size,
+                    colorName: variant.colorName,
+                    slug: product.slug,
+                    name: product.name,
+                    image: product.image,
+                    priceCents: variant.priceCents,
+                  }
+                : {
+                    id: product.id,
+                    productId: product.id,
+                    slug: product.slug,
+                    name: product.name,
+                    image: product.image,
+                    priceCents: product.priceCents,
+                  },
+            );
             openCart();
           }}
           style={{ backgroundColor: "#000", borderRadius: "var(--btn-radius, 9999px)" }}

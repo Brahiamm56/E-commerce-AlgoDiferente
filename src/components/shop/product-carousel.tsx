@@ -2,14 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef, useState, useEffect, useCallback } from "react";
 
 import { AddToCartButton } from "@/components/shop/add-to-cart-button";
 import { useGsapContext, gsap, ScrollTrigger } from "@/lib/gsap";
 import type { CatalogProduct } from "@/lib/catalog";
-import { formatCurrencyFromCents } from "@/lib/utils";
-import { useCartStore } from "@/store/cart";
+import { formatPriceRangeFromCents } from "@/lib/utils";
 
 type ProductCarouselProps = {
   badge?: string;
@@ -58,8 +57,6 @@ export function ProductCarousel({ badge, href, products, title }: ProductCarouse
     };
   }, [products.length]);
 
-  if (products.length === 0) return null;
-
   const updateScrollState = useCallback(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -84,6 +81,8 @@ export function ProductCarousel({ badge, href, products, title }: ProductCarouse
       window.removeEventListener("resize", updateScrollState);
     };
   }, [updateScrollState]);
+
+  if (products.length === 0) return null;
 
   const scroll = (direction: "left" | "right") => {
     const el = scrollerRef.current;
@@ -173,9 +172,6 @@ export function ProductCarousel({ badge, href, products, title }: ProductCarouse
 }
 
 function CarouselCard({ product }: { product: CatalogProduct }) {
-  const addItem = useCartStore((state) => state.addItem);
-  const openCart = useCartStore((state) => state.openCart);
-
   return (
     <article
       className="group flex w-[44vw] max-w-[220px] shrink-0 snap-start flex-col overflow-hidden border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:w-[calc(50%-8px)] sm:max-w-none md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]"
@@ -207,7 +203,7 @@ function CarouselCard({ product }: { product: CatalogProduct }) {
         <p className="line-clamp-1 text-[10px] text-[var(--muted-foreground)] sm:text-[11px]">{product.category.name}</p>
 
         <div className="mt-auto flex items-center justify-between gap-1.5 pt-1.5">
-          <p className="text-xs font-bold sm:text-sm">{formatCurrencyFromCents(product.priceCents)}</p>
+          <p className="text-xs font-bold sm:text-sm">{formatPriceRangeFromCents(product.minPriceCents, product.maxPriceCents)}</p>
           <AddToCartButton product={product} />
         </div>
       </div>

@@ -1,5 +1,3 @@
-import type { NextConfig } from "next";
-
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 const allowedOrigins = Array.from(
@@ -12,7 +10,7 @@ const allowedOrigins = Array.from(
           return null;
         }
       })
-      .filter((value): value is string => Boolean(value)),
+      .filter((value) => Boolean(value)),
   ),
 );
 
@@ -52,7 +50,10 @@ const adminNoIndexHeaders = [
   { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet" },
 ];
 
-const nextConfig: NextConfig = {
+const nextConfig = {
+  turbopack: {
+    root: __dirname,
+  },
   experimental: {
     serverActions: {
       allowedOrigins,
@@ -88,4 +89,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

@@ -25,16 +25,17 @@ export function useGsapContext<T extends HTMLElement>(
   // useLayoutEffect on client only; useEffect on server safely.
   const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+  // eslint-disable-next-line react-hooks/refs
   useIsoLayoutEffect(() => {
-    if (!ref.current) return;
+    const element = ref.current;
+    if (!element) return;
     ensureRegistered();
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion) return;
 
-    const ctx = gsap.context(setup, ref);
+    const ctx = gsap.context(setup, element);
     return () => ctx.revert();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return ref;

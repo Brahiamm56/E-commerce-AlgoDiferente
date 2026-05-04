@@ -18,8 +18,8 @@ type StoreSettingsFormProps = {
   cloudinaryEnabled?: boolean;
 };
 
-const DEFAULT_ACCENT = "#d35d47";
-const DEFAULT_ACCENT_STRONG = "#8f2616";
+const DEFAULT_ACCENT = "#7c3aed";
+const DEFAULT_ACCENT_STRONG = "#5b21b6";
 
 const DEFAULT_HOURS: BusinessHour[] = [
   { day: "Lunes", open: "09:00", close: "18:00" },

@@ -15,15 +15,14 @@ type ProductOption = {
 };
 
 export function NewSaleTrigger({ products }: { products: ProductOption[] }) {
-  const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [open, setOpen] = useState(() => searchParams.get("new") === "1");
 
   // Auto-open when navigated with ?new=1 and clean the param
   useEffect(() => {
     if (searchParams.get("new") === "1") {
-      setOpen(true);
       const params = new URLSearchParams(searchParams.toString());
       params.delete("new");
       const next = params.toString();

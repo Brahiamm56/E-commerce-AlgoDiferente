@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { getStoreSettings } from "@/lib/catalog";
 import { updateStoreSettingsAction } from "@/actions/admin";
 import { SettingsPageClient } from "@/components/admin/settings-page-client";

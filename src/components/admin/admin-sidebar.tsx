@@ -5,12 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Boxes,
+  ClipboardList,
   Image as ImageIcon,
   LayoutTemplate,
   LogOut,
+  MonitorSmartphone,
   Settings,
   Shapes,
-  BadgeDollarSign,
+  Truck,
+  Users,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -18,8 +21,12 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutTemplate },
-  { href: "/admin/ventas", label: "Ventas", icon: BadgeDollarSign },
+  { href: "/admin/pos", label: "POS", icon: MonitorSmartphone },
   { href: "/admin/productos", label: "Productos", icon: Boxes },
+  { href: "/admin/variantes", label: "Variantes", icon: ClipboardList },
+  { href: "/admin/clientes", label: "Clientes", icon: Users },
+  { href: "/admin/proveedores", label: "Proveedores", icon: Truck },
+  { href: "/admin/compras", label: "Compras", icon: ClipboardList },
   { href: "/admin/categorias", label: "Categorias", icon: Shapes },
   { href: "/admin/banners", label: "Banners", icon: ImageIcon },
   { href: "/admin/ajustes", label: "Ajustes", icon: Settings },

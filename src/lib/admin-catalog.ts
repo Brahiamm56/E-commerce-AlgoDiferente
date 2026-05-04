@@ -3,15 +3,27 @@ import { isDatabaseConfigured } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 export type AdminProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type AdminProductKind = "APPAREL" | "FOOTWEAR";
 
-export type AdminProduct = CatalogProduct & {
+export type AdminProduct = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  kind: AdminProductKind;
+  category: { name: string; slug: string };
   categoryId: string;
+  priceCents: number;
+  stock: number;
+  featured: boolean;
+  image: string;
   imageAlt: string;
   imagePublicId: string | null;
   sku: string | null;
   status: AdminProductStatus;
   createdAt: Date;
   updatedAt: Date;
+  accent: string;
 };
 
 export type AdminCategory = CatalogCategory;
@@ -20,6 +32,7 @@ function mapFallbackProduct(product: CatalogProduct): AdminProduct {
   const now = new Date();
   return {
     ...product,
+    kind: "APPAREL",
     categoryId: product.category.slug,
     imageAlt: product.name,
     imagePublicId: null,
@@ -68,6 +81,7 @@ export async function getAdminProducts() {
           slug: product.slug,
           name: product.name,
           description: product.description,
+          kind: product.kind,
           category: {
             name: product.category.name,
             slug: product.category.slug,

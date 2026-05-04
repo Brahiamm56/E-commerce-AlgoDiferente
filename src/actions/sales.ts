@@ -87,7 +87,7 @@ export async function createSaleAction(_: AdminFormState, formData: FormData): P
           customerPhone: parsed.data.customerPhone || null,
           deliveryMethod: parsed.data.deliveryMethod || null,
           notes: parsed.data.notes || null,
-          status: parsed.data.status as any,
+          status: parsed.data.status,
           paymentMethod: parsed.data.paymentMethod,
           paidWithCash: parsed.data.paidWithCash,
           paidWithTransfer: parsed.data.paidWithTransfer,

@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import type { AdminFormState } from "@/actions/admin-state";
@@ -10,7 +11,7 @@ import { logAndMaskError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { sanitizeWhatsappNumber } from "@/lib/utils";
 import { categorySchema } from "@/schemas/category";
-import { productSchema } from "@/schemas/product";
+import { productSchema, productVariantDraftsSchema } from "@/schemas/product";
 import { storeSettingsSchema } from "@/schemas/settings";
 import { bannerSchema } from "@/schemas/banner";
 
@@ -73,6 +74,28 @@ function toSlug(name: string) {
     .replace(/[\s]+/g, "-");
 }
 
+function centsToDecimal(value: number) {
+  return new Prisma.Decimal(value).div(100);
+}
+
+function normalizeSkuPart(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+}
+
+function buildVariantSku(args: { colorName: string; productSku: string | null; size: string; slug: string }) {
+  const base = normalizeSkuPart(args.productSku || args.slug) || "PRODUCTO";
+  const size = normalizeSkuPart(args.size) || "TALLE";
+  const color = normalizeSkuPart(args.colorName) || "COLOR";
+
+  return `${base}-${size}-${color}`.slice(0, 120);
+}
+
 export async function createCategoryQuickAction(_: AdminFormState, formData: FormData): Promise<AdminFormState> {
   await requireAdminSession();
 
@@ -126,6 +149,7 @@ function getProductPayload(formData: FormData) {
     imageAlt: getString(formData, "imageAlt"),
     imagePublicId: getString(formData, "imagePublicId"),
     imageUrl: getString(formData, "imageUrl"),
+    kind: getString(formData, "kind") || "APPAREL",
     name,
     priceCents: Number.isFinite(price) ? Math.round(price * 100) : Number.NaN,
     sku: getString(formData, "sku"),
@@ -133,6 +157,25 @@ function getProductPayload(formData: FormData) {
     status: getString(formData, "status") || "PUBLISHED",
     stock: Number(getString(formData, "stock")),
   };
+}
+
+function getProductVariantsPayload(formData: FormData, fallbackStock: number) {
+  const rawVariants = getString(formData, "variants");
+
+  if (!rawVariants) {
+    return [{ colorHex: "", colorName: "Sin color", size: "UNICO", stock: fallbackStock }];
+  }
+
+  try {
+    const parsed = JSON.parse(rawVariants) as unknown;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
 }
 
 async function syncProductImage(args: {
@@ -212,19 +255,70 @@ export async function createProductAction(_: AdminFormState, formData: FormData)
     );
   }
 
+  const variants = productVariantDraftsSchema.safeParse(
+    getProductVariantsPayload(formData, parsed.data.stock),
+  );
+
+  if (!variants.success) {
+    return buildErrorState("Revisa los talles, colores y stock antes de guardar.", {
+      variants: variants.error.issues.map((issue) => issue.message),
+    });
+  }
+
   try {
-    const product = await prisma.product.create({
-      data: {
-        categoryId: parsed.data.categoryId,
-        description: parsed.data.description,
-        featured: parsed.data.featured,
-        name: parsed.data.name,
-        priceCents: parsed.data.priceCents,
-        sku: parsed.data.sku || null,
-        slug: parsed.data.slug,
-        status: parsed.data.status,
-        stock: parsed.data.stock,
-      },
+    const product = await prisma.$transaction(async (tx) => {
+      const aggregateStock = variants.data.reduce((sum, variant) => sum + variant.stock, 0);
+      const createdProduct = await tx.product.create({
+        data: {
+          categoryId: parsed.data.categoryId,
+          description: parsed.data.description,
+          featured: parsed.data.featured,
+          kind: parsed.data.kind,
+          name: parsed.data.name,
+          priceCents: parsed.data.priceCents,
+          sku: parsed.data.sku || null,
+          slug: parsed.data.slug,
+          status: parsed.data.status,
+          stock: aggregateStock,
+        },
+      });
+
+      for (const variant of variants.data) {
+        const createdVariant = await tx.productVariant.create({
+          data: {
+            active: parsed.data.status === "PUBLISHED",
+            colorHex: variant.colorHex || null,
+            colorName: variant.colorName,
+            cost: centsToDecimal(0),
+            internalSku: buildVariantSku({
+              colorName: variant.colorName,
+              productSku: parsed.data.sku || null,
+              size: variant.size,
+              slug: parsed.data.slug,
+            }),
+            price: centsToDecimal(parsed.data.priceCents),
+            productId: createdProduct.id,
+            size: variant.size,
+            stock: variant.stock,
+          },
+        });
+
+        if (variant.stock !== 0) {
+          await tx.stockMovement.create({
+            data: {
+              productId: createdProduct.id,
+              quantity: variant.stock,
+              stockAfter: variant.stock,
+              stockBefore: 0,
+              type: "INITIAL",
+              variantId: createdVariant.id,
+              notes: "Stock inicial cargado desde alta de producto.",
+            },
+          });
+        }
+      }
+
+      return createdProduct;
     });
 
     await syncProductImage({
@@ -272,6 +366,7 @@ export async function updateProductAction(_: AdminFormState, formData: FormData)
         categoryId: parsed.data.categoryId,
         description: parsed.data.description,
         featured: parsed.data.featured,
+        kind: parsed.data.kind,
         name: parsed.data.name,
         priceCents: parsed.data.priceCents,
         sku: parsed.data.sku || null,
@@ -382,8 +477,29 @@ export async function deleteProductAction(_: AdminFormState, formData: FormData)
       return buildErrorState("El producto ya no existe o fue eliminado previamente.");
     }
 
-    await prisma.product.delete({
-      where: { id: productId },
+    // Eliminar dependencias con onDelete: Restrict antes de borrar el producto.
+    // Se usa una transacción para garantizar consistencia.
+    await prisma.$transaction(async (tx) => {
+      // Obtener IDs de variantes del producto
+      const variants = await tx.productVariant.findMany({
+        where: { productId },
+        select: { id: true },
+      });
+      const variantIds = variants.map((v) => v.id);
+
+      // 1. Eliminar movimientos de stock (Restrict en productId y variantId)
+      await tx.stockMovement.deleteMany({ where: { productId } });
+
+      // 2. Eliminar items de órdenes de compra que referencian las variantes (Restrict)
+      if (variantIds.length > 0) {
+        await tx.purchaseOrderItem.deleteMany({ where: { variantId: { in: variantIds } } });
+      }
+
+      // 3. Eliminar items de pedidos web (OrderItem.productId es Restrict y no nullable)
+      await tx.orderItem.deleteMany({ where: { productId } });
+
+      // 4. Borrar el producto; las variantes e imágenes se eliminan por Cascade
+      await tx.product.delete({ where: { id: productId } });
     });
 
     if (isCloudinaryConfigured()) {

@@ -9,7 +9,7 @@ import { AddToCartButton } from "@/components/shop/add-to-cart-button";
 import { WishlistButton } from "@/components/shop/wishlist-button";
 import { Badge } from "@/components/ui/badge";
 import type { CatalogProduct } from "@/lib/catalog";
-import { formatCurrencyFromCents } from "@/lib/utils";
+import { formatPriceRangeFromCents } from "@/lib/utils";
 
 type QuickViewProps = {
   product: CatalogProduct;
@@ -17,6 +17,8 @@ type QuickViewProps = {
 
 export function QuickView({ product }: QuickViewProps) {
   const [open, setOpen] = useState(false);
+  const lowStock = product.stock > 0 && product.stock <= 3;
+  const lastUnit = product.stock <= 0;
 
   useEffect(() => {
     if (open) {
@@ -110,11 +112,16 @@ export function QuickView({ product }: QuickViewProps) {
 
                 <div className="mt-5 flex items-baseline gap-2">
                   <p className="font-[family-name:var(--font-display)] text-2xl font-bold sm:text-3xl">
-                    {formatCurrencyFromCents(product.priceCents)}
+                    {formatPriceRangeFromCents(product.minPriceCents, product.maxPriceCents)}
                   </p>
-                  {product.stock > 0 && product.stock <= 3 && (
+                  {lowStock && (
                     <span className="text-xs font-semibold uppercase tracking-wide text-amber-600">
                       ¡Últimas {product.stock}!
+                    </span>
+                  )}
+                  {lastUnit && (
+                    <span className="text-xs font-semibold uppercase tracking-wide text-neutral-700">
+                      Último en stock
                     </span>
                   )}
                 </div>
@@ -132,7 +139,7 @@ export function QuickView({ product }: QuickViewProps) {
                 </div>
 
                 <p className="mt-4 text-[10px] uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                  Stock disponible: {product.stock}
+                  {lastUnit ? "Venta habilitada bajo consulta de stock" : `Stock disponible: ${product.stock}`}
                 </p>
               </div>
             </div>

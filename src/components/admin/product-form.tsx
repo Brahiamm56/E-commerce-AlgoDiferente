@@ -10,7 +10,7 @@ import { FormSubmitButton } from "@/components/admin/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { AdminCategory, AdminProduct } from "@/lib/admin-catalog";
+import type { AdminCategory, AdminProduct, AdminProductKind } from "@/lib/admin-catalog";
 
 type ProductFormProps = {
   action: (state: AdminFormState, payload: FormData) => Promise<AdminFormState>;
@@ -25,6 +25,38 @@ type ProductFormProps = {
 
 function getFieldError(state: AdminFormState, fieldName: string) {
   return state.fieldErrors?.[fieldName]?.[0];
+}
+
+const APPAREL_SIZE_PRESET = ["XS", "S", "M", "L", "XL", "XXL"];
+const FOOTWEAR_SIZE_PRESET = Array.from({ length: 28 }, (_, index) => String(index + 20));
+const DEFAULT_SELECTED_SIZES: Record<AdminProductKind, string[]> = {
+  APPAREL: ["S", "M", "L", "XL"],
+  FOOTWEAR: ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44"],
+};
+
+type VariantColorRow = {
+  hex: string;
+  id: string;
+  name: string;
+  stockBySize: Record<string, number>;
+};
+
+function createColorRow(id = "color-0"): VariantColorRow {
+  return {
+    hex: "#111827",
+    id,
+    name: "Sin color",
+    stockBySize: {},
+  };
+}
+
+function getSizePreset(kind: AdminProductKind) {
+  return kind === "FOOTWEAR" ? FOOTWEAR_SIZE_PRESET : APPAREL_SIZE_PRESET;
+}
+
+function normalizeCustomSize(kind: AdminProductKind, value: string) {
+  const trimmed = value.trim();
+  return kind === "FOOTWEAR" ? trimmed.replace(/[^0-9.]/g, "") : trimmed.toUpperCase();
 }
 
 function QuickAddCategoryForm({
@@ -133,6 +165,10 @@ export function ProductForm({
   const [createdCategories, setCreatedCategories] = useState<AdminCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(defaultCategoryId);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [productKind, setProductKind] = useState<AdminProductKind>(product?.kind ?? "APPAREL");
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(() => DEFAULT_SELECTED_SIZES[productKind]);
+  const [customSize, setCustomSize] = useState("");
+  const [colorRows, setColorRows] = useState<VariantColorRow[]>(() => [createColorRow()]);
   const imageFieldKey = product
     ? `${product.id}-${product.imagePublicId ?? product.image}`
     : `create-${state.submissionKey ?? 0}`;
@@ -149,6 +185,19 @@ export function ProductForm({
     selectedCategoryId && availableCategories.some((category) => category.id === selectedCategoryId)
       ? selectedCategoryId
       : product?.categoryId ?? availableCategories[0]?.id ?? "";
+  const variantDrafts = product
+    ? []
+    : colorRows.flatMap((colorRow) =>
+        selectedSizes.map((size) => ({
+          colorHex: colorRow.hex,
+          colorName: colorRow.name.trim(),
+          size,
+          stock: colorRow.stockBySize[size] ?? 0,
+        })),
+      );
+  const variantStockTotal = variantDrafts.reduce((sum, variant) => sum + variant.stock, 0);
+  const sizePreset = getSizePreset(productKind);
+  const visibleSizes = Array.from(new Set([...sizePreset, ...selectedSizes]));
 
   useEffect(() => {
     if (!product && state.status === "success") {
@@ -156,9 +205,57 @@ export function ProductForm({
     }
   }, [product, state.status]);
 
+  function handleKindChange(value: AdminProductKind) {
+    setProductKind(value);
+
+    if (!product) {
+      setSelectedSizes(DEFAULT_SELECTED_SIZES[value]);
+      setColorRows((currentRows) => currentRows.map((row) => ({ ...row, stockBySize: {} })));
+    }
+  }
+
+  function toggleSize(size: string) {
+    setSelectedSizes((currentSizes) =>
+      currentSizes.includes(size)
+        ? currentSizes.filter((currentSize) => currentSize !== size)
+        : [...currentSizes, size],
+    );
+  }
+
+  function addCustomSize() {
+    const nextSize = normalizeCustomSize(productKind, customSize);
+
+    if (!nextSize || selectedSizes.includes(nextSize)) {
+      setCustomSize("");
+      return;
+    }
+
+    setSelectedSizes((currentSizes) => [...currentSizes, nextSize]);
+    setCustomSize("");
+  }
+
+  function updateColorRow(rowId: string, patch: Partial<Omit<VariantColorRow, "id" | "stockBySize">>) {
+    setColorRows((currentRows) =>
+      currentRows.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
+    );
+  }
+
+  function updateVariantStock(rowId: string, size: string, value: string) {
+    const parsedValue = Math.max(0, Math.floor(Number(value) || 0));
+
+    setColorRows((currentRows) =>
+      currentRows.map((row) =>
+        row.id === rowId
+          ? { ...row, stockBySize: { ...row.stockBySize, [size]: parsedValue } }
+          : row,
+      ),
+    );
+  }
+
   return (
     <form action={formAction} className="space-y-5" ref={formRef}>
       {product ? <input name="productId" type="hidden" value={product.id} /> : null}
+      {!product ? <input name="variants" type="hidden" value={JSON.stringify(variantDrafts)} /> : null}
 
       <fieldset className="space-y-5 disabled:opacity-60" disabled={disabled}>
         <div className="space-y-2">
@@ -215,21 +312,180 @@ export function ProductForm({
             <label className="text-sm font-medium" htmlFor={product ? `${product.id}-stock` : "create-product-stock"}>
               Stock
             </label>
-            <Input
-              defaultValue={product?.stock ?? 0}
-              id={product ? `${product.id}-stock` : "create-product-stock"}
-              min="0"
-              name="stock"
-              step="1"
-              type="number"
-            />
+            {product ? (
+              <Input
+                defaultValue={product.stock}
+                id={`${product.id}-stock`}
+                min="0"
+                name="stock"
+                step="1"
+                type="number"
+              />
+            ) : (
+              <Input
+                id="create-product-stock"
+                min="0"
+                name="stock"
+                readOnly
+                step="1"
+                type="number"
+                value={variantStockTotal}
+              />
+            )}
             {getFieldError(state, "stock") ? (
               <p className="text-sm text-[var(--accent-strong)]">{getFieldError(state, "stock")}</p>
             ) : null}
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        {!product ? (
+          <div className="space-y-4 rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--foreground)]">Talles, colores y stock</p>
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  Total cargado: {variantStockTotal} unidades
+                </p>
+              </div>
+              <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+                {productKind === "FOOTWEAR" ? "Numeración" : "Letras"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Talles</label>
+              <div className="flex flex-wrap gap-2">
+                {visibleSizes.map((size) => {
+                  const selected = selectedSizes.includes(size);
+
+                  return (
+                    <button
+                      className={
+                        selected
+                          ? "h-9 rounded-xl bg-[var(--foreground)] px-3 text-sm font-semibold text-white"
+                          : "h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-semibold text-[var(--muted-foreground)] transition hover:border-[var(--foreground)]/40"
+                      }
+                      key={size}
+                      onClick={() => toggleSize(size)}
+                      type="button"
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  className="h-10 rounded-xl"
+                  onChange={(event) => setCustomSize(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addCustomSize();
+                    }
+                  }}
+                  placeholder={productKind === "FOOTWEAR" ? "Agregar talle numérico" : "Agregar talle"}
+                  value={customSize}
+                />
+                <button
+                  className="h-10 shrink-0 rounded-xl border border-[var(--border)] bg-white px-4 text-sm font-semibold text-[var(--foreground)] transition hover:bg-black/5"
+                  onClick={addCustomSize}
+                  type="button"
+                >
+                  Agregar
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-medium">Colores</label>
+                <button
+                  className="text-xs font-semibold text-[var(--accent)] hover:underline"
+                  onClick={() =>
+                    setColorRows((currentRows) => [
+                      ...currentRows,
+                      { ...createColorRow(`color-${Date.now()}`), name: "" },
+                    ])
+                  }
+                  type="button"
+                >
+                  + Agregar color
+                </button>
+              </div>
+
+              {colorRows.map((colorRow, index) => (
+                <div className="rounded-2xl border border-[var(--border)] bg-white p-3" key={colorRow.id}>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_88px_auto]">
+                    <Input
+                      className="h-10 rounded-xl"
+                      onChange={(event) => updateColorRow(colorRow.id, { name: event.target.value })}
+                      placeholder="Color"
+                      value={colorRow.name}
+                    />
+                    <Input
+                      aria-label="Color visual"
+                      className="h-10 rounded-xl p-1"
+                      onChange={(event) => updateColorRow(colorRow.id, { hex: event.target.value })}
+                      type="color"
+                      value={colorRow.hex}
+                    />
+                    <button
+                      className="h-10 rounded-xl border border-[var(--border)] px-3 text-xs font-semibold text-[var(--muted-foreground)] disabled:opacity-40"
+                      disabled={colorRows.length === 1}
+                      onClick={() => setColorRows((currentRows) => currentRows.filter((row) => row.id !== colorRow.id))}
+                      type="button"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {selectedSizes.map((size) => (
+                      <label className="rounded-xl border border-[var(--border)] bg-gray-50/70 p-2" key={`${colorRow.id}-${size}`}>
+                        <span className="block text-xs font-semibold text-[var(--muted-foreground)]">
+                          {colorRow.name || `Color ${index + 1}`} / {size}
+                        </span>
+                        <Input
+                          className="mt-1 h-9 rounded-lg bg-white"
+                          min="0"
+                          onChange={(event) => updateVariantStock(colorRow.id, size, event.target.value)}
+                          step="1"
+                          type="number"
+                          value={colorRow.stockBySize[size] ?? 0}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {getFieldError(state, "variants") ? (
+              <p className="text-sm text-[var(--accent-strong)]">{getFieldError(state, "variants")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor={product ? `${product.id}-kind` : "create-product-kind"}>
+              Tipo
+            </label>
+            <Select
+              id={product ? `${product.id}-kind` : "create-product-kind"}
+              name="kind"
+              onChange={(event) => handleKindChange(event.target.value as AdminProductKind)}
+              value={productKind}
+            >
+              <option value="APPAREL">Indumentaria</option>
+              <option value="FOOTWEAR">Zapatillas</option>
+            </Select>
+            {getFieldError(state, "kind") ? (
+              <p className="text-sm text-[var(--accent-strong)]">{getFieldError(state, "kind")}</p>
+            ) : null}
+          </div>
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium" htmlFor={product ? `${product.id}-category` : "create-product-category"}>

@@ -6,6 +6,10 @@ import { useState } from "react";
 import type { StoreSettings } from "@/schemas/settings";
 
 type ThemeCustomizerProps = {
+  accent: string;
+  accentStrong: string;
+  onAccentChange: (value: string) => void;
+  onAccentStrongChange: (value: string) => void;
   settings: StoreSettings;
 };
 
@@ -29,62 +33,66 @@ const BTN_RADIUS_OPTIONS = [
 
 const PRESET_THEMES = [
   {
-    name: "Terracota",
-    bg: "#f4efe8",
+    name: "Logo ST",
+    bg: "#f7f4fb",
     card: "#ffffff",
-    border: "#e8e2da",
-    accent: "#d35d47",
+    border: "#e7e0f2",
+    accent: "#7c3aed",
+    accentStrong: "#5b21b6",
   },
   {
-    name: "Océano",
-    bg: "#eef4f7",
+    name: "Minimal",
+    bg: "#f6f6f3",
     card: "#ffffff",
-    border: "#d4e3ea",
-    accent: "#2d8f9f",
+    border: "#e3e1da",
+    accent: "#3f3a4a",
+    accentStrong: "#191622",
   },
   {
-    name: "Bosque",
-    bg: "#f0f4ec",
+    name: "Oliva",
+    bg: "#f4f6ef",
     card: "#ffffff",
-    border: "#d6e0cd",
-    accent: "#4a8c5c",
+    border: "#dde5d2",
+    accent: "#60724c",
+    accentStrong: "#334126",
   },
   {
-    name: "Violeta",
-    bg: "#f3f0f7",
+    name: "Grafito",
+    bg: "#f5f5f6",
     card: "#ffffff",
-    border: "#ddd6e8",
-    accent: "#7c5cbf",
+    border: "#dedee3",
+    accent: "#2f3340",
+    accentStrong: "#111827",
   },
   {
-    name: "Oscuro",
-    bg: "#1a1a1a",
-    card: "#2a2a2a",
-    border: "#3a3a3a",
-    accent: "#d35d47",
-  },
-  {
-    name: "Dorado",
-    bg: "#f7f3eb",
+    name: "Uva suave",
+    bg: "#f8f5fb",
     card: "#ffffff",
-    border: "#e8dfc9",
-    accent: "#b8860b",
+    border: "#eadff0",
+    accent: "#8b5cf6",
+    accentStrong: "#6d28d9",
   },
 ];
 
-export function ThemeCustomizer({ settings }: ThemeCustomizerProps) {
-  const [bg, setBg] = useState(settings.themeBackground ?? "#f4efe8");
+export function ThemeCustomizer({
+  accent,
+  accentStrong,
+  onAccentChange,
+  onAccentStrongChange,
+  settings,
+}: ThemeCustomizerProps) {
+  const [bg, setBg] = useState(settings.themeBackground ?? "#f7f4fb");
   const [cardBg, setCardBg] = useState(settings.themeCardBg ?? "#ffffff");
-  const [cardBorder, setCardBorder] = useState(settings.themeCardBorder ?? "#e8e2da");
+  const [cardBorder, setCardBorder] = useState(settings.themeCardBorder ?? "#e7e0f2");
   const [cardRadius, setCardRadius] = useState(settings.themeCardRadius ?? "xl");
   const [buttonRadius, setButtonRadius] = useState(settings.themeButtonRadius ?? "full");
-  const [accent, setAccent] = useState(settings.themeAccent ?? "#d35d47");
 
   const applyPreset = (preset: (typeof PRESET_THEMES)[number]) => {
     setBg(preset.bg);
     setCardBg(preset.card);
     setCardBorder(preset.border);
-    setAccent(preset.accent);
+    onAccentChange(preset.accent);
+    onAccentStrongChange(preset.accentStrong);
   };
 
   // Card radius class for preview
@@ -161,7 +169,8 @@ export function ThemeCustomizer({ settings }: ThemeCustomizerProps) {
           <ColorPicker color={bg} label="Fondo de la tienda" onChange={setBg} />
           <ColorPicker color={cardBg} label="Fondo de tarjetas" onChange={setCardBg} />
           <ColorPicker color={cardBorder} label="Borde de tarjetas" onChange={setCardBorder} />
-          <ColorPicker color={accent} label="Color de acento" onChange={setAccent} />
+          <ColorPicker color={accent} label="Color de acento" onChange={onAccentChange} />
+          <ColorPicker color={accentStrong} label="Color intenso" onChange={onAccentStrongChange} />
         </div>
       </div>
 

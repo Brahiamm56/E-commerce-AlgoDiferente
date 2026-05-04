@@ -2,20 +2,43 @@
 
 import { ShoppingCart } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { type CatalogProduct } from "@/lib/catalog";
+import { type CatalogProduct, type CatalogVariant } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cart";
 
 type AddToCartButtonProps = {
-  product: Pick<CatalogProduct, "id" | "slug" | "name" | "image" | "priceCents">;
+  product: Pick<CatalogProduct, "id" | "slug" | "name" | "image" | "priceCents" | "defaultVariant">;
+  selectedVariant?: CatalogVariant | null;
   className?: string;
   label?: string;
 };
 
-export function AddToCartButton({ product, className, label }: AddToCartButtonProps) {
+export function AddToCartButton({ product, selectedVariant, className, label }: AddToCartButtonProps) {
   const addItem = useCartStore((state) => state.addItem);
   const openCart = useCartStore((state) => state.openCart);
+  const variant = selectedVariant ?? product.defaultVariant;
+  const cartItem = variant
+    ? {
+        id: variant.id,
+        productId: product.id,
+        variantId: variant.id,
+        internalSku: variant.internalSku,
+        variantLabel: variant.label,
+        size: variant.size,
+        colorName: variant.colorName,
+        slug: product.slug,
+        name: product.name,
+        image: product.image,
+        priceCents: variant.priceCents,
+      }
+    : {
+        id: product.id,
+        productId: product.id,
+        slug: product.slug,
+        name: product.name,
+        image: product.image,
+        priceCents: product.priceCents,
+      };
 
   if (label) {
     return (
@@ -27,7 +50,7 @@ export function AddToCartButton({ product, className, label }: AddToCartButtonPr
         )}
         onClick={(e) => {
           e.preventDefault();
-          addItem(product);
+          addItem(cartItem);
           openCart();
         }}
         style={{ backgroundColor: "#000", borderRadius: "var(--btn-radius, 9999px)" }}
@@ -48,7 +71,7 @@ export function AddToCartButton({ product, className, label }: AddToCartButtonPr
       )}
       onClick={(e) => {
         e.preventDefault();
-        addItem(product);
+        addItem(cartItem);
         openCart();
       }}
       style={{ backgroundColor: "#000", borderRadius: "var(--btn-radius, 9999px)" }}

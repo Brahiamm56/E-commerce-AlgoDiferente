@@ -43,8 +43,8 @@ export function SettingsPageClient({
   cloudinaryEnabled = false,
 }: SettingsPageClientProps) {
   const [state, formAction] = useActionState(action, initialAdminFormState);
-  const [accent, setAccent] = useState(settings.themeAccent ?? "#d35d47");
-  const [accentStrong, setAccentStrong] = useState(settings.themeAccentStrong ?? "#8f2616");
+  const [accent, setAccent] = useState(settings.themeAccent ?? "#7c3aed");
+  const [accentStrong, setAccentStrong] = useState(settings.themeAccentStrong ?? "#5b21b6");
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>(
     settings.businessHours && settings.businessHours.length > 0
       ? settings.businessHours
@@ -276,7 +276,13 @@ export function SettingsPageClient({
 
           {/* ====== RIGHT COLUMN: Theme Customizer ====== */}
           <div className="lg:sticky lg:top-20 lg:self-start">
-            <ThemeCustomizer settings={settings} />
+            <ThemeCustomizer
+              accent={accent}
+              accentStrong={accentStrong}
+              onAccentChange={setAccent}
+              onAccentStrongChange={setAccentStrong}
+              settings={settings}
+            />
           </div>
         </div>
 

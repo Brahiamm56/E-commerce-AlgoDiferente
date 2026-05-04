@@ -1,11 +1,19 @@
 import "dotenv/config";
 
-import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { hash } from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import { Pool } from "pg";
 
-const connectionString = process.env.DATABASE_URL ?? "";
-const adapter = new PrismaNeon({ connectionString });
+const connectionString =
+  process.env.DATABASE_URL ?? "postgresql://demo:demo@localhost:5432/demo";
+const pool = new Pool({
+  connectionString,
+  ssl: {
+    rejectUnauthorized: process.env.NODE_ENV === "production",
+  },
+});
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
@@ -277,6 +285,13 @@ async function main() {
         description: "Tienda catálogo con checkout por WhatsApp.",
         whatsappNumber: "573001234567",
         currency: "COP",
+        themeAccent: "#7c3aed",
+        themeAccentStrong: "#5b21b6",
+        themeBackground: "#f7f4fb",
+        themeCardBg: "#ffffff",
+        themeCardBorder: "#e7e0f2",
+        themeCardRadius: "xl",
+        themeButtonRadius: "full",
       },
     },
   });
@@ -289,4 +304,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

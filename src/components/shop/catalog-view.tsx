@@ -26,7 +26,9 @@ export function CatalogView({ categories, products, initialQuery = "", showFavor
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setMounted(true), 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Filter and sort products
@@ -52,10 +54,10 @@ export function CatalogView({ categories, products, initialQuery = "", showFavor
     // Sort
     switch (sortBy) {
       case "price-asc":
-        result.sort((a, b) => a.priceCents - b.priceCents);
+        result.sort((a, b) => a.minPriceCents - b.minPriceCents);
         break;
       case "price-desc":
-        result.sort((a, b) => b.priceCents - a.priceCents);
+        result.sort((a, b) => b.maxPriceCents - a.maxPriceCents);
         break;
       case "name":
         result.sort((a, b) => a.name.localeCompare(b.name));
