@@ -7,7 +7,19 @@ import { requireAdminSession } from "@/lib/admin";
 import { isDatabaseConfigured } from "@/lib/env";
 import { logAndMaskError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { purchaseOrderCreateSchema, purchaseOrderReceiveSchema } from "@/schemas/purchase-order";
+import {
+  purchaseOrderCreateSchema,
+  purchaseOrderReceiveSchema,
+  type PurchaseOrderCreateInput,
+} from "@/schemas/purchase-order";
+
+export type PurchaseOrderCreateActionResult = {
+  status: "success" | "error";
+  message: string;
+  orderId?: string;
+  orderNumber?: string;
+  fieldErrors?: Record<string, string[] | undefined>;
+};
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -22,43 +34,103 @@ function buildNumber(prefix: string) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
-export async function createPurchaseOrderAction(formData: FormData) {
+export async function createPurchaseOrderAction(
+  input: PurchaseOrderCreateInput,
+): Promise<PurchaseOrderCreateActionResult> {
   await requireAdminSession();
-  if (!isDatabaseConfigured()) return;
 
-  const parsed = purchaseOrderCreateSchema.safeParse({
-    supplierId: getString(formData, "supplierId"),
-    variantId: getString(formData, "variantId"),
-    quantity: Number(getString(formData, "quantity") || 0),
-    unitCostCents: Math.round(Number(getString(formData, "unitCost") || 0) * 100),
-    notes: getString(formData, "notes"),
-  });
+  if (!isDatabaseConfigured()) {
+    return {
+      status: "error",
+      message: "La base de datos no esta configurada.",
+    };
+  }
 
-  if (!parsed.success) return;
+  const parsed = purchaseOrderCreateSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Revisa los datos del pedido antes de finalizar.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
 
   try {
-    await prisma.purchaseOrder.create({
+    const variantIds = parsed.data.items.map((item) => item.variantId);
+    const variants = await prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, active: true },
+      select: {
+        id: true,
+        productId: true,
+      },
+    });
+
+    if (variants.length !== variantIds.length) {
+      return {
+        status: "error",
+        message: "Una o mas variantes ya no estan disponibles. Recarga la pagina e intenta nuevamente.",
+      };
+    }
+
+    const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+
+    for (const item of parsed.data.items) {
+      const variant = variantById.get(item.variantId);
+
+      if (!variant || variant.productId !== item.productId) {
+        return {
+          status: "error",
+          message: "Detectamos cambios en el catalogo. Vuelve a armar el pedido para continuar.",
+        };
+      }
+    }
+
+    const subtotalCents = parsed.data.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitCostCents,
+      0,
+    );
+    const orderNumber = buildNumber("OC");
+
+    const order = await prisma.purchaseOrder.create({
       data: {
-        orderNumber: buildNumber("OC"),
+        orderNumber,
         supplierId: parsed.data.supplierId,
         status: "SENT",
-        subtotal: centsToDecimal(parsed.data.unitCostCents * parsed.data.quantity),
+        subtotal: centsToDecimal(subtotalCents),
         notes: parsed.data.notes || null,
         sentAt: new Date(),
         items: {
-          create: {
-            variantId: parsed.data.variantId,
-            quantityOrdered: parsed.data.quantity,
-            unitCost: centsToDecimal(parsed.data.unitCostCents),
-          },
+          create: parsed.data.items.map((item) => ({
+            variantId: item.variantId,
+            quantityOrdered: item.quantity,
+            unitCost: centsToDecimal(item.unitCostCents),
+          })),
         },
       },
+      select: {
+        id: true,
+        orderNumber: true,
+      },
     });
+
+    revalidatePath("/admin/compras");
+    revalidatePath("/admin/proveedores");
+
+    return {
+      status: "success",
+      message: `Pedido ${order.orderNumber} generado correctamente.`,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+    };
   } catch (error) {
     logAndMaskError("create-purchase-order", error, "No fue posible crear la orden de compra.");
-  }
 
-  revalidatePath("/admin/compras");
+    return {
+      status: "error",
+      message: "No fue posible crear la orden de compra.",
+    };
+  }
 }
 
 export async function receivePurchaseOrderAction(formData: FormData) {
@@ -109,7 +181,7 @@ export async function receivePurchaseOrderAction(formData: FormData) {
             unitCost: item.unitCost,
             relatedPurchaseOrderId: order.id,
             createdById: session.user.id,
-            notes: `Recepción ${order.orderNumber}`,
+            notes: `Recepcion ${order.orderNumber}`,
           },
         });
       }

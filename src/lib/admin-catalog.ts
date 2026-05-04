@@ -1,6 +1,22 @@
+import { createClient } from "@supabase/supabase-js";
+
 import { getCatalogProducts, getCategories, type CatalogProduct, type CatalogCategory } from "@/lib/catalog";
-import { isDatabaseConfigured } from "@/lib/env";
-import { prisma } from "@/lib/prisma";
+
+function isDatabaseConfigured() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("change-me"),
+  );
+}
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
 
 export type AdminProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 export type AdminProductKind = "APPAREL" | "FOOTWEAR";
@@ -51,55 +67,44 @@ export async function getAdminProducts() {
   }
 
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-        images: {
-          select: {
-            alt: true,
-            publicId: true,
-            url: true,
-          },
-          orderBy: {
-            sortOrder: "asc",
-          },
-          take: 1,
-        },
-      },
-      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-    });
+    const supabase = getSupabaseAdmin();
+    const { data: products, error } = await supabase
+      .from("Product")
+      .select(
+        `id, slug, name, description, kind, priceCents, stock, featured, status, sku, createdAt, updatedAt, categoryId,
+         category:Category(id, name, slug),
+         images:ProductImage(url, alt, publicId, sortOrder)`,
+      )
+      .order("updatedAt", { ascending: false })
+      .order("createdAt", { ascending: false });
 
-    return products.length > 0
-      ? products.map((product) => ({
-          id: product.id,
-          slug: product.slug,
-          name: product.name,
-          description: product.description,
-          kind: product.kind,
-          category: {
-            name: product.category.name,
-            slug: product.category.slug,
-          },
-          categoryId: product.categoryId,
-          priceCents: product.priceCents,
-          stock: product.stock,
-          featured: product.featured,
-          image: product.images[0]?.url ?? fallback[0]?.image ?? "",
-          imageAlt: product.images[0]?.alt ?? product.name,
-          imagePublicId: product.images[0]?.publicId ?? null,
-          sku: product.sku,
-          status: product.status,
-          createdAt: product.createdAt,
-          updatedAt: product.updatedAt,
-          accent: fallback.find((item) => item.slug === product.slug)?.accent ?? fallback[0]?.accent ?? "from-[#f6d0c7] via-[#fff8f5] to-[#d9ece8]",
-        }))
-      : [];
+    if (error || !products || products.length === 0) return [];
+
+    return products.map((product) => {
+      const category = Array.isArray(product.category) ? product.category[0] : product.category;
+      const images = ((product.images as { url: string; alt: string | null; publicId: string | null; sortOrder: number }[]) ?? [])
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      return {
+        id: product.id,
+        slug: product.slug,
+        name: product.name,
+        description: product.description,
+        kind: product.kind as AdminProductKind,
+        category: { name: category?.name ?? "", slug: category?.slug ?? "" },
+        categoryId: product.categoryId,
+        priceCents: product.priceCents,
+        stock: product.stock,
+        featured: product.featured,
+        image: images[0]?.url ?? fallback[0]?.image ?? "",
+        imageAlt: images[0]?.alt ?? product.name,
+        imagePublicId: images[0]?.publicId ?? null,
+        sku: product.sku,
+        status: product.status as AdminProductStatus,
+        createdAt: new Date(product.createdAt),
+        updatedAt: new Date(product.updatedAt),
+        accent: fallback.find((item) => item.slug === product.slug)?.accent ?? fallback[0]?.accent ?? "from-[#f6d0c7] via-[#fff8f5] to-[#d9ece8]",
+      };
+    });
   } catch {
     return fallback;
   }
@@ -113,27 +118,25 @@ export async function getAdminCategories(): Promise<AdminCategory[]> {
   }
 
   try {
-    const categories = await prisma.category.findMany({
-      include: {
-        _count: {
-          select: {
-            products: true,
-          },
-        },
-      },
-      orderBy: [{ order: "asc" }, { name: "asc" }],
-    });
+    const supabase = getSupabaseAdmin();
+    const { data: categories, error } = await supabase
+      .from("Category")
+      .select(`id, name, slug, description, order, products:Product(id)`)
+      .order("order", { ascending: true })
+      .order("name", { ascending: true });
 
-    return categories.length > 0
-      ? categories.map((category) => ({
-          id: category.id,
-          name: category.name,
-          slug: category.slug,
-          description: category.description ?? "Categoria administrable desde el panel.",
-          productCount: category._count.products,
-          order: category.order,
-        }))
-      : fallback;
+    if (error || !categories) return fallback;
+
+    const mapped = categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description: category.description ?? "Categoria administrable desde el panel.",
+      productCount: Array.isArray(category.products) ? category.products.length : 0,
+      order: category.order,
+    }));
+
+    return mapped.length > 0 ? mapped : fallback;
   } catch {
     return fallback;
   }
@@ -154,20 +157,15 @@ export type AdminBanner = {
 export async function getAdminBanners(): Promise<AdminBanner[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const banners = await prisma.heroBanner.findMany({
-      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-    });
-    return banners.map((b) => ({
-      id: b.id,
-      title: b.title,
-      subtitle: b.subtitle,
-      ctaLabel: b.ctaLabel,
-      ctaHref: b.ctaHref,
-      imageUrl: b.imageUrl,
-      imagePublicId: b.imagePublicId,
-      order: b.order,
-      active: b.active,
-    }));
+    const supabase = getSupabaseAdmin();
+    const { data: banners, error } = await supabase
+      .from("HeroBanner")
+      .select("id, title, subtitle, ctaLabel, ctaHref, imageUrl, imagePublicId, order, active")
+      .order("order", { ascending: true })
+      .order("createdAt", { ascending: false });
+
+    if (error || !banners) return [];
+    return banners as AdminBanner[];
   } catch {
     return [];
   }

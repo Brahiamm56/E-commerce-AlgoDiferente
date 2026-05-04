@@ -52,3 +52,4 @@ next-env.d.ts
 
 # memory tool (local notes)
 /memories
+.env*.local

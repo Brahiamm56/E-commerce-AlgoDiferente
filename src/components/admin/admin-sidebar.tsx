@@ -10,6 +10,7 @@ import {
   LayoutTemplate,
   LogOut,
   MonitorSmartphone,
+  PackageSearch,
   Settings,
   Shapes,
   Truck,
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutTemplate },
+  { href: "/admin/pedidos", label: "Pedidos", icon: PackageSearch },
   { href: "/admin/pos", label: "POS", icon: MonitorSmartphone },
   { href: "/admin/productos", label: "Productos", icon: Boxes },
   { href: "/admin/variantes", label: "Variantes", icon: ClipboardList },

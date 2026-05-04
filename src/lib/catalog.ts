@@ -1,7 +1,26 @@
-import { isDatabaseConfigured } from "@/lib/env";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@supabase/supabase-js";
+
 import { siteConfig } from "@/lib/site-config";
 import { storeSettingsSchema, type StoreSettings } from "@/schemas/settings";
+
+// Use the Supabase REST API (HTTPS) for all catalog reads.
+// Supabase free tier direct connections are IPv6-only and unreachable from
+// Vercel serverless functions. The REST API works over HTTPS from all environments.
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
+
+function isDatabaseConfigured() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("change-me"),
+  );
+}
 
 export type CatalogProduct = {
   id: string;
@@ -303,45 +322,50 @@ export async function getCatalogProducts() {
   }
 
   try {
-    const products = await prisma.product.findMany({
-      where: { status: "PUBLISHED" },
-      include: {
-        category: {
-          select: {
-            name: true,
-            slug: true,
-          },
-        },
-        images: {
-          select: {
-            url: true,
-          },
-          orderBy: {
-            sortOrder: "asc",
-          },
-          take: 1,
-        },
-        variants: {
-          where: { active: true },
-          select: {
-            id: true,
-            internalSku: true,
-            size: true,
-            colorName: true,
-            colorHex: true,
-            price: true,
-            stock: true,
-            stockReserved: true,
-          },
-          orderBy: [{ colorName: "asc" }, { size: "asc" }],
-        },
-      },
-      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
-    });
+    const supabase = getSupabaseAdmin();
+    const { data: products, error } = await supabase
+      .from("Product")
+      .select(
+        `id, slug, name, description, priceCents, stock, featured, status, createdAt,
+         category:Category(name, slug),
+         images:ProductImage(url, sortOrder),
+         variants:ProductVariant(id, internalSku, size, colorName, colorHex, price, stock, stockReserved, active)`,
+      )
+      .eq("status", "PUBLISHED")
+      .order("featured", { ascending: false })
+      .order("createdAt", { ascending: false });
 
-    return products.map(mapCatalogProduct);
+    if (error || !products) return demoProducts;
+    if (products.length === 0) return demoProducts;
+
+    return products.map((p) => {
+      const category = Array.isArray(p.category) ? p.category[0] : p.category;
+      const images = ((p.images as { url: string; sortOrder: number }[]) ?? []).sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      );
+      const activeVariants = (
+        p.variants as {
+          id: string;
+          internalSku: string;
+          size: string;
+          colorName: string;
+          colorHex: string | null;
+          price: string;
+          stock: number;
+          stockReserved: number;
+          active: boolean;
+        }[]
+      ).filter((v) => v.active);
+
+      return mapCatalogProduct({
+        ...p,
+        category: category ?? { name: "Sin categoría", slug: "sin-categoria" },
+        images,
+        variants: activeVariants,
+      });
+    });
   } catch {
-    return [];
+    return demoProducts;
   }
 }
 
@@ -356,34 +380,39 @@ export async function getProductBySlug(slug: string): Promise<CatalogProduct | n
   }
 
   try {
-    const product = await prisma.product.findUnique({
-      where: { slug },
-      include: {
-        category: { select: { name: true, slug: true } },
-        images: {
-          select: { url: true, alt: true },
-          orderBy: { sortOrder: "asc" },
-        },
-        variants: {
-          where: { active: true },
-          select: {
-            id: true,
-            internalSku: true,
-            size: true,
-            colorName: true,
-            colorHex: true,
-            price: true,
-            stock: true,
-            stockReserved: true,
-          },
-          orderBy: [{ colorName: "asc" }, { size: "asc" }],
-        },
-      },
-    });
+    const supabase = getSupabaseAdmin();
+    const { data: product, error } = await supabase
+      .from("Product")
+      .select(
+        `id, slug, name, description, priceCents, stock, featured, status, createdAt,
+         category:Category(name, slug),
+         images:ProductImage(url, alt, sortOrder),
+         variants:ProductVariant(id, internalSku, size, colorName, colorHex, price, stock, stockReserved, active)`,
+      )
+      .eq("slug", slug)
+      .maybeSingle();
 
-    if (!product || product.status !== "PUBLISHED") {
+    if (error || !product || product.status !== "PUBLISHED") {
       return null;
     }
+
+    const category = Array.isArray(product.category) ? product.category[0] : product.category;
+    const images = ((product.images as { url: string; alt: string | null; sortOrder: number }[]) ?? []).sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    );
+    const activeVariants = (
+      product.variants as {
+        id: string;
+        internalSku: string;
+        size: string;
+        colorName: string;
+        colorHex: string | null;
+        price: string;
+        stock: number;
+        stockReserved: number;
+        active: boolean;
+      }[]
+    ).filter((v) => v.active);
 
     const accent =
       demoProducts.find((item) => item.slug === product.slug)?.accent ?? demoProducts[0].accent;
@@ -391,9 +420,11 @@ export async function getProductBySlug(slug: string): Promise<CatalogProduct | n
     return {
       ...mapCatalogProduct({
         ...product,
-        images: product.images.map((img) => ({ url: img.url })),
+        category: category ?? { name: "Sin categoría", slug: "sin-categoria" },
+        images,
+        variants: activeVariants,
       }),
-      images: product.images.map((img) => ({
+      images: images.map((img) => ({
         url: img.url,
         alt: img.alt ?? product.name,
       })),
@@ -411,30 +442,28 @@ export async function getCategories() {
   }
 
   try {
-    const categories = await prisma.category.findMany({
-      include: {
-        _count: {
-          select: {
-            products: true,
-          },
-        },
-      },
-      orderBy: [{ order: "asc" }, { name: "asc" }],
-    });
+    const supabase = getSupabaseAdmin();
+    const { data: categories, error } = await supabase
+      .from("Category")
+      .select(`id, name, slug, description, order, products:Product(id)`)
+      .order("order", { ascending: true })
+      .order("name", { ascending: true });
 
-    return categories.length > 0
-      ? categories.map((category) => ({
-          id: category.id,
-          name: category.name,
-          slug: category.slug,
-          description:
-            category.description ??
-            demoCategories.find((item) => item.slug === category.slug)?.description ??
-            "Categoria administrable desde el panel.",
-          productCount: category._count.products,
-          order: category.order,
-        }))
-      : demoCategories;
+    if (error || !categories) return demoCategories;
+
+    const mapped = categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description:
+        category.description ??
+        demoCategories.find((item) => item.slug === category.slug)?.description ??
+        "Categoria administrable desde el panel.",
+      productCount: Array.isArray(category.products) ? category.products.length : 0,
+      order: category.order,
+    }));
+
+    return mapped.length > 0 ? mapped : demoCategories;
   } catch {
     return demoCategories;
   }
@@ -460,11 +489,15 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   }
 
   try {
-    const record = await prisma.setting.findUnique({
-      where: { key: "store" },
-    });
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("Setting")
+      .select("value")
+      .eq("key", "store")
+      .maybeSingle();
 
-    const parsed = storeSettingsSchema.safeParse(record?.value);
+    if (error || !data) return fallback;
+    const parsed = storeSettingsSchema.safeParse(data.value);
     return parsed.success ? parsed.data : fallback;
   } catch {
     return fallback;
@@ -502,19 +535,16 @@ const demoBanners: CatalogBanner[] = [
 export async function getActiveBanners(): Promise<CatalogBanner[]> {
   if (!isDatabaseConfigured()) return demoBanners;
   try {
-    const banners = await prisma.heroBanner.findMany({
-      where: { active: true },
-      orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
-    });
-    if (banners.length === 0) return demoBanners;
-    return banners.map((b) => ({
-      id: b.id,
-      title: b.title,
-      subtitle: b.subtitle,
-      ctaLabel: b.ctaLabel,
-      ctaHref: b.ctaHref,
-      imageUrl: b.imageUrl,
-    }));
+    const supabase = getSupabaseAdmin();
+    const { data: banners, error } = await supabase
+      .from("HeroBanner")
+      .select("id, title, subtitle, ctaLabel, ctaHref, imageUrl")
+      .eq("active", true)
+      .order("order", { ascending: true })
+      .order("createdAt", { ascending: false });
+
+    if (error || !banners || banners.length === 0) return demoBanners;
+    return banners as CatalogBanner[];
   } catch {
     return demoBanners;
   }
