@@ -90,22 +90,37 @@ export function assertProductionEnv() {
     return;
   }
 
+  // Only the vars that are strictly required for the app to boot.
+  // Cloudinary / Supabase keys are needed for uploads/auth but the store
+  // can still render pages without them — so we warn rather than throw.
   const required = [
     "DATABASE_URL",
     "NEXTAUTH_SECRET",
-    "NEXTAUTH_URL",
-    "NEXT_PUBLIC_APP_URL",
-    "CLOUDINARY_CLOUD_NAME",
-    "CLOUDINARY_API_KEY",
-    "CLOUDINARY_API_SECRET",
   ];
   const missing = required.filter((key) => !hasConfiguredValue(process.env[key]));
   if (missing.length > 0) {
     // Do not include actual values, just keys.
     throw new Error(
       `[env] Missing required production env vars: ${missing.join(", ")}. ` +
-        `Configure them in your hosting secret manager before booting.`,
+        `Configure them in your hosting provider before booting.`,
     );
   }
+
+  // Warn (but don't throw) for vars that affect features but not page rendering.
+  const recommended = [
+    "NEXTAUTH_URL",
+    "NEXT_PUBLIC_APP_URL",
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+  ];
+  const missingRecommended = recommended.filter((key) => !hasConfiguredValue(process.env[key]));
+  if (missingRecommended.length > 0) {
+    console.warn(
+      `[env] Recommended env vars not set: ${missingRecommended.join(", ")}. ` +
+        `Some features may be unavailable.`,
+    );
+  }
+
   assertedProductionEnv = true;
 }
