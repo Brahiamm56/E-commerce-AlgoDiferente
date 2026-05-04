@@ -1,4 +1,5 @@
 import { compare } from "bcryptjs";
+import { createClient } from "@supabase/supabase-js";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { getServerSession, type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -43,11 +44,29 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        let user;
+        let user: { id: string; email: string; name: string | null; role: string; passwordHash: string } | null = null;
         try {
-          user = await prisma.user.findUnique({
-            where: { email: parsed.data.email },
-          });
+          // Use Supabase REST API (HTTPS) instead of direct TCP connection.
+          // Supabase free tier direct connections are IPv6-only and unreachable
+          // from Vercel serverless. The REST API works over HTTPS from all environments.
+          const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+            process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+            { auth: { persistSession: false, autoRefreshToken: false } },
+          );
+          const { data, error } = await supabaseAdmin
+            .from("User")
+            .select("id, email, name, role, passwordHash")
+            .eq("email", parsed.data.email)
+            .single<{ id: string; email: string; name: string | null; role: string; passwordHash: string }>();
+          if (error) {
+            if (error.code === "PGRST116") {
+              console.error("[auth] User not found:", parsed.data.email);
+              return null;
+            }
+            throw error;
+          }
+          user = data;
         } catch (err) {
           console.error("[auth] DB query failed:", err);
           return null;
