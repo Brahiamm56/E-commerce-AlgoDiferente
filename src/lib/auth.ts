@@ -27,6 +27,7 @@ export const authOptions: NextAuthOptions = {
         const parsed = loginSchema.safeParse(credentials);
 
         if (!parsed.success) {
+          console.error("[auth] Invalid credentials schema:", parsed.error.issues);
           return null;
         }
 
@@ -38,20 +39,29 @@ export const authOptions: NextAuthOptions = {
           windowMs: 60_000,
         });
         if (!rl.success) {
+          console.error("[auth] Rate limit exceeded for:", parsed.data.email);
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email },
-        });
+        let user;
+        try {
+          user = await prisma.user.findUnique({
+            where: { email: parsed.data.email },
+          });
+        } catch (err) {
+          console.error("[auth] DB query failed:", err);
+          return null;
+        }
 
         if (!user) {
+          console.error("[auth] User not found:", parsed.data.email);
           return null;
         }
 
         const isValid = await compare(parsed.data.password, user.passwordHash);
 
         if (!isValid) {
+          console.error("[auth] Invalid password for:", parsed.data.email);
           return null;
         }
 
