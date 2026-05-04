@@ -1,8 +1,23 @@
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+// VERCEL_URL is provided automatically by Vercel per deployment (no https prefix).
+// NEXTAUTH_URL takes precedence if set; otherwise NextAuth falls back to VERCEL_URL.
+// We expose NEXTAUTH_URL via next.config so it works on every preview/prod deployment
+// without having to update the env var manually after each deploy.
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL !== "http://localhost:3000"
+    ? process.env.NEXT_PUBLIC_APP_URL
+    : vercelUrl ?? "http://localhost:3000";
+
+// Make NEXTAUTH_URL available at runtime when not explicitly set, so NextAuth
+// does not reject credentials on Vercel preview/production deployments.
+if (!process.env.NEXTAUTH_URL && vercelUrl) {
+  process.env.NEXTAUTH_URL = vercelUrl;
+}
 
 const allowedOrigins = Array.from(
   new Set(
-    [appUrl, "http://localhost:3000"]
+    [appUrl, vercelUrl, "http://localhost:3000"]
+      .filter(Boolean)
       .map((value) => {
         try {
           return new URL(value).host;
