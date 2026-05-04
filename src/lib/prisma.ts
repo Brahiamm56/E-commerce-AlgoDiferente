@@ -21,7 +21,10 @@ function createPrismaClient() {
   const pool = new Pool({
     connectionString,
     ssl: {
-      rejectUnauthorized: process.env.NODE_ENV === "production",
+      // Supabase uses valid certs but rejectUnauthorized must be false
+      // when connecting via the direct connection string (port 5432).
+      // The connection string itself carries sslmode=no-verify / require.
+      rejectUnauthorized: false,
     },
   });
   const adapter = new PrismaPg(pool);
